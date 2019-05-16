@@ -1,3 +1,6 @@
 # IDEA files
 .idea/
 *.iml
+
+.venv
+*.egg-info
