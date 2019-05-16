@@ -43,10 +43,12 @@ def _start(user: str, password: str, since: datetime, till: datetime, out_dir: s
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Download image attachments from GMail")
     parser.add_argument("dir", type=str, help="Directory where data will be stored")
-    parser.add_argument("--since", type=str, default=None,
-                        help="Lower bound for filtering emails; format: YYYY-MM-DD, i.e. 2019-02-21; default: UTC yesterday")
+    parser.add_argument("--box", type=str, default=GMAIL_MAILBOX,
+                        help="Mailbox to download emails from; default to {}".format(GMAIL_MAILBOX))
     parser.add_argument("--till", type=str, default=None,
-                        help="Upper bound for filtering emails; format: YYYY-MM-DD, i.e. 2019-02-22; default: UTC today")
+                        help="Upper bound for selecting emails; format: YYYY-MM-DD, i.e. 2019-02-22; default: UTC today")
+    parser.add_argument("--since", type=str, default=None,
+                        help="Lower bound for selecting emails; format: YYYY-MM-DD, i.e. 2019-02-21; default: till - 1 day")
     parser.add_argument("--rm", action='store_true', help="If set, downloaded emails will be deleted")
     parser.add_argument("--log", type=str, default=None, help="Log events to file instead of stdout")
     return parser.parse_args()
@@ -59,7 +61,7 @@ def main(user: Optional[str], password: Optional[str], since: datetime, till: da
     if not password:
         raise ValueError("Env var GMAIL_PASSWORD is not set!")
     if since > till:
-        raise ValueError("Since: {} is after till {}!".format(since.isoformat(), till.isoformat()))
+        raise ValueError("Since date {} is after till date {}!".format(since.isoformat(), till.isoformat()))
     out_dir = path.abspath(out_dir)
     if not path.isdir(out_dir):
         raise ValueError("{} doest not exist or is not a directory!".format(out_dir))
@@ -68,11 +70,16 @@ def main(user: Optional[str], password: Optional[str], since: datetime, till: da
 
 
 def cli_main() -> None:
-    args = parse_args()
-    till_dt = parse(args.till).date() if args.till is not None else datetime.now().date()
-    since_dt = parse(args.since).date() if args.since is not None else till_dt - timedelta(days=1)
-    main(user=os.getenv("GMAIL_USER"), password=os.getenv("GMAIL_PASSWORD"),
-         since=since_dt, till=till_dt, out_dir=args.dir, remove=args.rm, log=args.log)
+    try:
+        args = parse_args()
+        till_dt = parse(args.till).date() if args.till is not None else datetime.utcnow().date()
+        since_dt = parse(args.since).date() if args.since is not None else till_dt - timedelta(days=1)
+        main(user=os.getenv("GMAIL_USER"), password=os.getenv("GMAIL_PASSWORD"),
+             since=since_dt, till=till_dt, out_dir=args.dir, remove=args.rm, log=args.log)
+        exit(0)
+    except Exception as e:
+        print("Error: {}".format(e))
+        exit(1)
 
 
 if __name__ == "__main__":
