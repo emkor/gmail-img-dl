@@ -17,13 +17,22 @@ GMAIL_MAILBOX = "INBOX"
 GMAIL_ALL_MAILBOX = "[Gmail]/Wszystkie"
 
 
-def login(username: str, password: str) -> IMAP4_SSL:
-    imap_session = imaplib.IMAP4_SSL(GMAIL_HOST)
-    typ, account_details = imap_session.login(username, password)
-    if typ == IMAP_OK:
-        return imap_session
-    else:
-        raise ValueError("Could not login as {}: {}".format(username, typ))
+class ImapSession:
+    def __init__(self, username: str, password: str):
+        self.password = password
+        self.username = username
+        self._session = None
+
+    def __enter__(self) -> imaplib.IMAP4_SSL:
+        self._session = imaplib.IMAP4_SSL(GMAIL_HOST)
+        typ, account_details = self._session.login(self.username, self.password)
+        if typ == IMAP_OK:
+            return self._session
+        else:
+            raise ValueError("Could not login as {}: {}".format(self.username, typ))
+
+    def __exit__(self, *args) -> None:
+        self._session.close()
 
 
 class GmailClient:
@@ -82,4 +91,4 @@ def _build_email_msg(raw_email: EmailMessage) -> Email:
 
 
 def _build_list_email_criteria(since: date, before: date) -> str:
-    return "(SINCE '{}' BEFORE '{}')".format(since.strftime("%d-%b-%Y"), before.strftime("%d-%b-%Y"))
+    return '(SINCE "{}" BEFORE "{}")'.format(since.strftime("%d-%b-%Y"), before.strftime("%d-%b-%Y"))
