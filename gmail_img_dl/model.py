@@ -1,10 +1,6 @@
 from copy import copy
 from datetime import datetime
-from email.message import EmailMessage
 from typing import Dict
-
-import pytz
-from dateutil.parser import parse
 
 from gmail_img_dl.utils import utc_datetime_to_iso_format, utc_iso_format_to_datetime
 
@@ -13,7 +9,7 @@ class Model(object):
     def to_serializable(self) -> Dict:
         return copy(self.__dict__)
 
-    def from_serializable(self, json_dict) -> 'Model':
+    def from_serializable(self, json_dict):
         return self.__class__(**json_dict)
 
 
@@ -42,5 +38,3 @@ class Email(Model):
     def from_serializable(self, json_dict):
         json_dict.update({"date_sent": utc_iso_format_to_datetime(json_dict["date_sent"])})
         return self.__class__(**json_dict)
-
-
