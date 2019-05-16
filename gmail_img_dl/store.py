@@ -14,14 +14,13 @@ class ImageStore:
     def __init__(self, dir_path: str) -> None:
         self.dir_path = dir_path
 
-    def save(self, mail: Email, attachments: List[Attachment]) -> None:
-        prefix = "{}_{}_{}_{}".format(mail.date_sent.date().isoformat(),
-                                      mail.date_sent.time().isoformat().replace(":", "-"),
-                                      mail.sender_name,
-                                      mail.message_id)
-
-        self._store_email_meta(prefix, mail)
+    def save_attach(self, mail: Email, attachments: List[Attachment]) -> None:
+        prefix = self._gen_prefix(mail)
         self._store_image_attach(attachments, prefix, mail)
+
+    def save_meta(self, mail: Email) -> None:
+        prefix = self._gen_prefix(mail)
+        self._store_email_meta(prefix, mail)
 
     def _store_image_attach(self, attachments: List[Attachment], prefix, mail):
         for attachment in attachments:
@@ -36,6 +35,13 @@ class ImageStore:
         if not path.exists(email_meta_file_name):
             with open(email_meta_file_name, "w") as email_file:
                 json.dump(mail.to_serializable(), email_file)
+
+    def _gen_prefix(self, mail):
+        prefix = "{}_{}_{}_{}".format(mail.date_sent.date().isoformat(),
+                                      mail.date_sent.time().isoformat().replace(":", "-"),
+                                      mail.sender_name,
+                                      mail.message_id)
+        return prefix
 
 
 def write_time_taken_exif_if_needed(image_file_path: str, time_taken: datetime) -> None:
