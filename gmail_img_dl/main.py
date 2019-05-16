@@ -22,7 +22,7 @@ def _start(user: str, password: str, since: datetime, till: datetime, out_dir: s
     for i, email_id in enumerate(email_ids):
         try:
             msg = "Fetching email {} / {}...".format(i + 1, len(email_ids))
-            if i % 100 == 0:
+            if i % 50 == 0:
                 logging.info(msg)
             else:
                 logging.debug(msg)
