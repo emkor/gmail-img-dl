@@ -1,5 +1,6 @@
 import imaplib
 import email
+import logging
 from email.message import EmailMessage
 from imaplib import IMAP4_SSL
 from datetime import date
@@ -56,7 +57,7 @@ class GmailClient:
         typ, message_parts = self.imap_session.fetch(email_id, "(RFC822)")
         if typ == IMAP_OK:
             email_body_text = message_parts[0][1].decode("utf-8")
-            email_body = email.message_from_string(email_body_text, _class=EmailMessage)
+            email_body: EmailMessage = email.message_from_string(email_body_text, _class=EmailMessage)  # type: ignore
             attach = get_mail_attachments(email_body)
             return _build_email_msg(email_body), attach
         else:
@@ -69,24 +70,24 @@ class GmailClient:
 
 def get_mail_attachments(mail: EmailMessage) -> List[Attachment]:
     attachments = []
-    for attachment in mail.iter_attachments():
-        mime_type = attachment.get_content_type()
+    for attach in mail.iter_attachments():
+        mime_type = attach.get_content_type()
         if mime_type.lower() in ACCEPTED_MIME_TYPES:
-            attachments.append(Attachment(mime_type, attachment.get_filename(), attachment.get_payload(decode=True)))
+            a = Attachment(mime_type, attach.get_filename(), attach.get_payload(decode=True))  # type: ignore
+            attachments.append(a)
         else:
-            print("Ignoring attachment of mime-type {}".format(mime_type))
+            logging.warning("Ignoring attachment {} having MIME: {}".format(attach.get_filename(), mime_type))
     return attachments
 
 
 def _build_email_msg(raw_email: EmailMessage) -> Email:
-    parsed_utc_date = parse(raw_email.get("Date")).astimezone(pytz.utc)
-    raw_sender = raw_email.get("From")
-    sender_name_raw, _, sender_mail_raw = raw_sender.partition("<")
+    parsed_utc_date = parse(str(raw_email.get("Date"))).astimezone(pytz.utc)
+    sender_name_raw, _, sender_mail_raw = str(raw_email.get("From")).partition("<")
     sender_mail = sender_mail_raw.replace(">", "")
     sender_name = sender_name_raw.replace('"', '')
-    recipient = raw_email.get("To").replace("<", "").replace(">", "")
-    subject = raw_email.get("Subject")
-    raw_message_id, _, _ = raw_email.get("Message-ID").partition("@")
+    recipient = str(raw_email.get("To")).replace("<", "").replace(">", "")
+    subject = str(raw_email.get("Subject"))
+    raw_message_id, _, _ = str(raw_email.get("Message-ID")).partition("@")
     message_id = raw_message_id.replace("<", "")
     return Email(message_id, parsed_utc_date, sender_name, sender_mail, recipient, subject)
 
