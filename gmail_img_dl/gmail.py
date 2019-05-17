@@ -3,7 +3,7 @@ import email
 from email.message import EmailMessage
 from imaplib import IMAP4_SSL
 from datetime import date
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 
 import pytz
 from dateutil.parser import parse
@@ -18,21 +18,22 @@ GMAIL_ALL_MAILBOX = "[Gmail]/Wszystkie"
 
 
 class ImapSession:
-    def __init__(self, username: str, password: str):
+    def __init__(self, username: str, password: str) -> None:
         self.password = password
         self.username = username
-        self._session = None
+        self._session: Optional[imaplib.IMAP4_SSL] = None
 
     def __enter__(self) -> imaplib.IMAP4_SSL:
-        self._session = imaplib.IMAP4_SSL(GMAIL_HOST)
-        typ, account_details = self._session.login(self.username, self.password)
+        self._session = imaplib.IMAP4_SSL(GMAIL_HOST)  # type: ignore
+        typ, account_details = self._session.login(self.username, self.password)  # type: ignore
         if typ == IMAP_OK:
             return self._session
         else:
             raise ValueError("Could not login as {}: {}".format(self.username, typ))
 
     def __exit__(self, *args) -> None:
-        self._session.close()
+        if self._session is not None:
+            self._session.close()
 
 
 class GmailClient:
