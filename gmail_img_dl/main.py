@@ -11,6 +11,8 @@ from gmail_img_dl.gmail import GmailClient, GMAIL_MAILBOX, ImapSession
 from gmail_img_dl.store import ImageStore
 from gmail_img_dl.utils import setup_logger
 
+CHUNK_SIZE = 10
+
 
 def _start(user: str, password: str, since: date, till: date, out_dir: str, remove: bool, dl_meta: bool):
     start_time = datetime.utcnow()
@@ -21,18 +23,21 @@ def _start(user: str, password: str, since: date, till: date, out_dir: str, remo
         logging.info("Retrieving {} email messages from {} from period {}-{}".format(len(email_ids), user,
                                                                                      since.isoformat(),
                                                                                      till.isoformat()))
-        for i, email_id in enumerate(email_ids):
-            msg = "Fetching email {} / {}...".format(i + 1, len(email_ids))
-            if i % 10 == 0:
-                logging.info(msg)
-            else:
-                logging.debug(msg)
+        chunk_start, i = datetime.utcnow(), 1
+        for email_id in email_ids:
             email, attach = gmail.fetch(email_id)
             store.save_attach(email, attach)
             if dl_meta:
                 store.save_meta(email)
             if remove:
                 gmail.trash(email_id)
+            if i % CHUNK_SIZE == 0:
+                chunk_took = (datetime.utcnow() - chunk_start).total_seconds()
+                msg = "Fetched emails {} - {} / {} in {:.3f}s...".format(i - CHUNK_SIZE + 1, i,
+                                                                         len(email_ids), chunk_took)
+                logging.info(msg)
+                chunk_start = datetime.utcnow()
+            i += 1
     took_sec = (datetime.utcnow() - start_time).total_seconds()
     logging.info(
         "Stored {} emails from period {}-{} under {} in {:.3f}s ({:.3f}s/email)!".format(len(email_ids),
