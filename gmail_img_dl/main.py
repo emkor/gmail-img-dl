@@ -1,7 +1,7 @@
 import argparse
 import logging
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from os import path
 from typing import Optional
 
@@ -12,7 +12,7 @@ from gmail_img_dl.store import ImageStore
 from gmail_img_dl.utils import setup_logger
 
 
-def _start(user: str, password: str, since: datetime, till: datetime, out_dir: str, remove: bool, dl_meta: bool):
+def _start(user: str, password: str, since: date, till: date, out_dir: str, remove: bool, dl_meta: bool):
     start_time = datetime.utcnow()
     with ImapSession(username=user, password=password) as session:
         gmail = GmailClient(session)
@@ -59,7 +59,7 @@ def parse_args() -> argparse.Namespace:
 
 
 def main(user: Optional[str], password: Optional[str], mailbox: str,
-         since: datetime, till: datetime, out_dir: str, remove: bool, dl_meta: bool, log: Optional[str]) -> None:
+         since: date, till: date, out_dir: str, remove: bool, dl_meta: bool, log: Optional[str]) -> None:
     if not user:
         raise ValueError("Env var GMAIL_USER is not set")
     if not password:
