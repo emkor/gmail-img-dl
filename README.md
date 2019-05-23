@@ -1,5 +1,5 @@
 # gmail-img-dl
-CLI tool for retrieving image attachments from GMail messages (specifically from Reolink security cameras)
+CLI tool for retrieving image (JPEG) attachments from GMail messages (specifically messages from Reolink security cameras sent to GMail)
 
 ## prerequisites
 - Unix, `make`, `git`, `python3` with `pip`
