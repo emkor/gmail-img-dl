@@ -29,9 +29,9 @@ def _start(user: str, password: str, since: date, till: date, out_dir: str, remo
         while retries <= retry_limit:
             try:
                 email_ids = gmail.select_email_ids(mailbox=GMAIL_MAILBOX, since=since, before=till, for_delete=remove)
-                logging.info("Retrieving {} email messages from {} from period {}-{}".format(len(email_ids), user,
-                                                                                             since.isoformat(),
-                                                                                             till.isoformat()))
+                logging.info("Retrieving {} email messages from {} from period {} - {}".format(len(email_ids), user,
+                                                                                               since.isoformat(),
+                                                                                               till.isoformat()))
                 chunk_start, i = datetime.utcnow(), 1
                 for email_id in email_ids:
                     email, attach = gmail.fetch(email_id)
@@ -77,15 +77,17 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Download image attachments from GMail")
     parser.add_argument("dir", type=str, help="Directory where data will be stored")
     parser.add_argument("--box", type=str, default=GMAIL_MAILBOX,
-                        help="Mailbox to download emails from; default to {}".format(GMAIL_MAILBOX))
+                        help="Mailbox to download emails from; default: {}".format(GMAIL_MAILBOX))
     parser.add_argument("--till", type=str, default=None,
-                        help="Upper bound for selecting emails; format: YYYY-MM-DD, i.e. 2019-02-22; default: UTC today")
+                        help="Upper bound for email selection, i.e. 2019-02-22; defaults: UTC today")
     parser.add_argument("--since", type=str, default=None,
-                        help="Lower bound for selecting emails; format: YYYY-MM-DD, i.e. 2019-02-21; default: till - 1 day")
+                        help="Lower bound for email selection, i.e. 2019-02-21; default: --till - 1 day")
+    parser.add_argument("--days", type=int, default=None,
+                        help="How many days before --till of emails to retrieve, i.e. 2; overrides --since")
     parser.add_argument("--meta", action='store_true',
                         help="If set, will download email metadata and store as JSON file, too")
     parser.add_argument("--rm", action='store_true', help="If set, downloaded emails will be deleted")
-    parser.add_argument("--log", type=str, default=None, help="Log events to file instead of stdout")
+    parser.add_argument("--log", type=str, default=None, help="Log events to given file instead of stdout")
     return parser.parse_args()
 
 
@@ -114,7 +116,7 @@ def main(user: Optional[str], password: Optional[str], mailbox: str,
                                                                                              till.isoformat(),
                                                                                              out_dir,
                                                                                              took_sec,
-                                                                                             took_sec / downloaded_emails))
+                                                                                             took_sec / downloaded_emails if downloaded_emails > 0 else 0))
     else:
         raise RuntimeError(
             "Retries reached limit ({} / {}) after {} downloaded emails and {}s".format(retries, retry_limit,
@@ -125,7 +127,10 @@ def cli_main() -> None:
     try:
         args = parse_args()
         till_dt = parse(args.till).date() if args.till is not None else datetime.utcnow().date()
-        since_dt = parse(args.since).date() if args.since is not None else till_dt - timedelta(days=1)
+        if args.days is not None and args.days > 0:
+            since_dt = till_dt - timedelta(days=args.days)
+        else:
+            since_dt = parse(args.since).date() if args.since is not None else till_dt - timedelta(days=1)
         main(user=os.getenv("GMAIL_USER"), password=os.getenv("GMAIL_PASSWORD"), mailbox=args.box,
              since=since_dt, till=till_dt, out_dir=args.dir, remove=args.rm, dl_meta=args.meta, log=args.log)
         exit(0)
