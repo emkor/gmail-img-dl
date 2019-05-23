@@ -24,7 +24,7 @@ class ImapSession:
         self.username = username
         self._session: Optional[imaplib.IMAP4_SSL] = None
 
-    def __enter__(self) -> imaplib.IMAP4_SSL:
+    def open(self) -> imaplib.IMAP4_SSL:
         self._session = imaplib.IMAP4_SSL(GMAIL_HOST)  # type: ignore
         typ, account_details = self._session.login(self.username, self.password)  # type: ignore
         if typ == IMAP_OK:
@@ -32,9 +32,15 @@ class ImapSession:
         else:
             raise ValueError("Could not login as {}: {}".format(self.username, typ))
 
-    def __exit__(self, *args) -> None:
+    def close(self) -> None:
         if self._session is not None:
             self._session.close()
+
+    def __enter__(self) -> imaplib.IMAP4_SSL:
+        return self.open()
+
+    def __exit__(self, *args) -> None:
+        return self.close()
 
 
 class GmailClient:

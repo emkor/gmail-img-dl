@@ -1,9 +1,11 @@
 import argparse
 import logging
 import os
+from collections import namedtuple
 from datetime import datetime, timedelta, date
 from os import path
-from typing import Optional
+from time import sleep
+from typing import Optional, Tuple
 
 from dateutil.parser import parse
 
@@ -11,40 +13,64 @@ from gmail_img_dl.gmail import GmailClient, GMAIL_MAILBOX, ImapSession
 from gmail_img_dl.store import ImageStore
 from gmail_img_dl.utils import setup_logger
 
+RETRIES = 5
+RETRY_SLEEP_SEC = 1
 CHUNK_SIZE = 10
 
+Result = namedtuple("Result", ["downloaded_emails", "retry_count"])
 
-def _start(user: str, password: str, since: date, till: date, out_dir: str, remove: bool, dl_meta: bool):
-    start_time = datetime.utcnow()
-    with ImapSession(username=user, password=password) as session:
-        gmail = GmailClient(session)
-        store = ImageStore(dir_path=out_dir)
-        email_ids = gmail.select_email_ids(mailbox=GMAIL_MAILBOX, since=since, before=till, for_delete=remove)
-        logging.info("Retrieving {} email messages from {} from period {}-{}".format(len(email_ids), user,
-                                                                                     since.isoformat(),
-                                                                                     till.isoformat()))
-        chunk_start, i = datetime.utcnow(), 1
-        for email_id in email_ids:
-            email, attach = gmail.fetch(email_id)
-            store.save_attach(email, attach)
-            if dl_meta:
-                store.save_meta(email)
-            if remove:
-                gmail.trash(email_id)
-            if i % CHUNK_SIZE == 0:
-                chunk_took = (datetime.utcnow() - chunk_start).total_seconds()
-                msg = "Fetched emails {} - {} / {} in {:.3f}s...".format(i - CHUNK_SIZE + 1, i,
-                                                                         len(email_ids), chunk_took)
-                logging.info(msg)
-                chunk_start = datetime.utcnow()
-            i += 1
-    took_sec = (datetime.utcnow() - start_time).total_seconds()
-    logging.info(
-        "Stored {} emails from period {}-{} under {} in {:.3f}s ({:.3f}s/email)!".format(len(email_ids),
-                                                                                         since.isoformat(),
-                                                                                         till.isoformat(), out_dir,
-                                                                                         took_sec,
-                                                                                         took_sec / len(email_ids)))
+
+def _start(user: str, password: str, since: date, till: date, out_dir: str, remove: bool, dl_meta: bool,
+           retry_limit: int) -> Result:
+    downloaded_emails, retries = 0, 0
+    session_wrapper = ImapSession(username=user, password=password)
+    gmail, store = _initialize(session_wrapper, out_dir)
+    try:
+        while retries <= retry_limit:
+            try:
+                email_ids = gmail.select_email_ids(mailbox=GMAIL_MAILBOX, since=since, before=till, for_delete=remove)
+                logging.info("Retrieving {} email messages from {} from period {}-{}".format(len(email_ids), user,
+                                                                                             since.isoformat(),
+                                                                                             till.isoformat()))
+                chunk_start, i = datetime.utcnow(), 1
+                for email_id in email_ids:
+                    email, attach = gmail.fetch(email_id)
+                    store.save_attach(email, attach)
+                    if dl_meta:
+                        store.save_meta(email)
+                    if remove:
+                        gmail.trash(email_id)
+                    if i % CHUNK_SIZE == 0:
+                        chunk_took = (datetime.utcnow() - chunk_start).total_seconds()
+                        msg = "Fetched emails {} - {} / {} in {:.3f}s...".format(i - CHUNK_SIZE + 1, i,
+                                                                                 len(email_ids), chunk_took)
+                        logging.info(msg)
+                        chunk_start = datetime.utcnow()
+                    downloaded_emails += 1
+                    i += 1
+                return Result(downloaded_emails, retries)
+            except KeyboardInterrupt as e:
+                logging.warning("Stopping due to keyboard interrupt!")
+                raise e
+            except Exception as e:
+                retries += 1
+                logging.warning(
+                    "Error: {}, retrying for {} / {} time in {}s...".format(e, retries, retry_limit, RETRY_SLEEP_SEC))
+                sleep(RETRY_SLEEP_SEC)
+                session_wrapper.close()
+                gmail, store = _initialize(session_wrapper, out_dir)
+        return Result(downloaded_emails, retries)
+    except Exception as e:
+        session_wrapper.close()
+        raise e
+
+
+def _initialize(session_wrapper: ImapSession, out_dir: str) -> Tuple[GmailClient, ImageStore]:
+    session_wrapper.close()
+    session = session_wrapper.open()
+    gmail = GmailClient(session)
+    store = ImageStore(dir_path=out_dir)
+    return gmail, store
 
 
 def parse_args() -> argparse.Namespace:
@@ -77,7 +103,22 @@ def main(user: Optional[str], password: Optional[str], mailbox: str,
     if not path.isdir(out_dir):
         raise ValueError("{} doest not exist or is not a directory".format(out_dir))
     setup_logger(log_file=log)
-    _start(user, password, since, till, out_dir, remove, dl_meta)
+    retry_limit = 5
+    start_time = datetime.utcnow()
+    downloaded_emails, retries = _start(user, password, since, till, out_dir, remove, dl_meta, retry_limit)
+    took_sec = (datetime.utcnow() - start_time).total_seconds()
+    if retries <= retry_limit:
+        logging.info(
+            "Stored {} emails from period {}-{} under {} in {:.3f}s ({:.3f}s/email)!".format(downloaded_emails,
+                                                                                             since.isoformat(),
+                                                                                             till.isoformat(),
+                                                                                             out_dir,
+                                                                                             took_sec,
+                                                                                             took_sec / downloaded_emails))
+    else:
+        raise RuntimeError(
+            "Retries reached limit ({} / {}) after {} downloaded emails and {}s".format(retries, retry_limit,
+                                                                                        downloaded_emails, took_sec))
 
 
 def cli_main() -> None:
