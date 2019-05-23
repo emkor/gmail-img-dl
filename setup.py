@@ -11,7 +11,7 @@ with open("requirements-dev.txt") as f:
 
 setup(
     name="gmail-img-dl",
-    version="0.0.2",
+    version="0.0.3",
     description="CLI tool for retrieving image attachments from GMail messages (specifically from Reolink security cameras)",
     author="Mateusz Korzeniowski",
     author_email="emkor93@gmail.com",
@@ -22,6 +22,6 @@ setup(
         'dev': REQUIREMENTS_DEV
     },
     entry_points={"console_scripts": [
-        "gmail_dl = gmail_img_dl.main:cli_main"
+        "gmail-dl = gmail_img_dl.main:cli_main"
     ]}
 )
