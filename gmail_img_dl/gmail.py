@@ -22,7 +22,7 @@ class ImapSession:
     def __init__(self, username: str, password: str) -> None:
         self.password = password
         self.username = username
-        self._session: Optional[imaplib.IMAP4_SSL] = None
+        self._session = None  # type: Optional[imaplib.IMAP4_SSL]
 
     def open(self) -> imaplib.IMAP4_SSL:
         self._session = imaplib.IMAP4_SSL(GMAIL_HOST)  # type: ignore
