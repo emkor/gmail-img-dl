@@ -63,7 +63,7 @@ class GmailClient:
         typ, message_parts = self.imap_session.fetch(email_id, "(RFC822)")
         if typ == IMAP_OK:
             email_body_text = message_parts[0][1].decode("utf-8")
-            email_body: EmailMessage = email.message_from_string(email_body_text, _class=EmailMessage)  # type: ignore
+            email_body = email.message_from_string(email_body_text, _class=EmailMessage)  # type: ignore
             attach = get_mail_attachments(email_body)
             return _build_email_msg(email_body), attach
         else:
